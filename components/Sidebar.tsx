@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, BookOpen, Palette, Settings, Briefcase, MousePointerClick, Languages, Database, AppWindow, Sliders, Zap } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Palette, Settings, Briefcase, MousePointerClick, Languages, Database, AppWindow, Sliders, Zap, FileJson } from 'lucide-react';
 import { AppView, SettingSectionId } from '../types';
 import { Logo } from './Logo';
 
@@ -27,6 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, onS
     { id: 'engines', label: '翻译引擎', icon: Languages },
     { id: 'preview', label: '真实效果预览', icon: Zap },
     { id: 'anki', label: 'Anki 集成', icon: Database },
+    { id: 'config-management', label: '配置管理', icon: FileJson },
   ] as const;
 
   return (

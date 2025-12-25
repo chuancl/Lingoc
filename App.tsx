@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { WordManager } from './components/WordManager';
 import { VisualStylesSection } from './components/StyleEditor';
-import { ScenariosSection, EnginesSection, InteractionSection, AnkiSection, PageWidgetSection, GeneralSection } from './components/Settings';
+import { ScenariosSection, EnginesSection, InteractionSection, AnkiSection, PageWidgetSection, GeneralSection, ConfigManagementSection } from './components/Settings';
 import { PreviewSection } from './components/settings/PreviewSection'; 
 import { WordDetail } from './components/WordDetail'; // Import new component
 import { Loader2 } from 'lucide-react';
@@ -166,6 +166,28 @@ const App: React.FC = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // --- Configuration Import Logic ---
+  const handleConfigImport = (newConfig: any) => {
+      if (newConfig.general) setAutoTranslate(newConfig.general);
+      if (newConfig.styles) setStyles(newConfig.styles);
+      if (newConfig.scenarios) setScenarios(newConfig.scenarios);
+      if (newConfig.interaction) setInteractionConfig(newConfig.interaction);
+      if (newConfig.pageWidget) setPageWidgetConfig(newConfig.pageWidget);
+      if (newConfig.engines) setEngines(newConfig.engines);
+      if (newConfig.anki) setAnkiConfig(newConfig.anki);
+  };
+
+  // Bundle current configs for export
+  const currentConfigs = {
+      general: autoTranslate,
+      styles: styles,
+      scenarios: scenarios,
+      interaction: interactionConfig,
+      pageWidget: pageWidgetConfig,
+      engines: engines,
+      anki: ankiConfig
+  };
+
   if (isLoading && entries.length === 0) {
     return <div className="h-screen w-full flex items-center justify-center bg-slate-50"><Loader2 className="w-8 h-8 text-blue-600 animate-spin"/></div>;
   }
@@ -264,6 +286,10 @@ const App: React.FC = () => {
 
                 <section id="anki" className="scroll-mt-8">
                   <AnkiSection config={ankiConfig} setConfig={setAnkiConfig} entries={entries} setEntries={setEntries} />
+                </section>
+
+                <section id="config-management" className="scroll-mt-8">
+                  <ConfigManagementSection currentConfigs={currentConfigs} onImport={handleConfigImport} />
                 </section>
              </div>
           )}
