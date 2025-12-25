@@ -240,6 +240,15 @@ export default defineContentScript({
     enginesStorage.watch(v => { if(v) currentEngines = v; });
     stylesStorage.watch(v => { if(v) currentStyles = v; });
 
+    const isVerticalTransBase = (cat: WordCategory, styles: Record<WordCategory, StyleConfig>) => {
+        const s = styles[cat];
+        if (!s) return false;
+        const isVert = s.layoutMode === 'vertical';
+        const layout = s.vertical;
+        const baseline = layout.baselineTarget || 'original';
+        return isVert && baseline === 'translation';
+    };
+
     /**
      * 应用替换逻辑
      */
@@ -350,26 +359,29 @@ export default defineContentScript({
             }
         }
 
-        // Perform DOM manipulation (reverse order to keep indices valid locally, but our logic uses relative node slicing so forward with tracking works too)
-        // Actually, nodeMap is static. It's safer to process.
-        // But since we are modifying text nodes (split/insert), previous logic was simple.
-        // Let's reuse the simple logic but ensure we account for changes. 
-        // Best approach for text replacement: reverse order to avoid offset shifts invalidating pending ops.
-        nonOverlappingReplacements.sort((a, b) => b.start - a.start);
+        // Perform DOM manipulation
+        nonOverlappingReplacements.sort((a, b) => b.start - a.start); // Reverse order for simpler slicing
 
         let lastStart = Number.MAX_VALUE;
+        let lastEntry: WordEntry | null = null;
+
         nonOverlappingReplacements.forEach(r => {
+            // Check for adjacent replacements requiring space
+            let addSpace = false;
+            // Since we process in reverse (right to left), 'lastStart' refers to the word on the RIGHT (which was processed previously).
+            // So if current word's END equals next word's START, they are adjacent.
+            // Example: [WordA][WordB]. Processing WordA. r=WordA, last=WordB. r.end === last.start.
+            if (lastEntry && r.end === lastStart) {
+                if (isVerticalTransBase(r.entry.category, currentStyles) && isVerticalTransBase(lastEntry.category, currentStyles)) {
+                    addSpace = true;
+                }
+            }
+
             // Safety check overlap (though already filtered)
             if (r.end <= lastStart) {
                 const target = nodeMap.find(n => r.start >= n.start && r.end <= n.end);
                 if (target) {
                     const { node, start } = target;
-                    // If node has been modified by a previous (later in text) replacement, node.nodeValue is shorter.
-                    // But since we sort descending by start, we process end of text first.
-                    // The 'node' reference is still valid, but its content might be truncated if we split it?
-                    // Actually, `splitText` returns the new node for the *latter* part. 
-                    // Our logic below does manual text manipulation.
-                    
                     const val = node.nodeValue || "";
                     // Calculate local offsets within the node
                     const localStart = r.start - start;
@@ -393,14 +405,24 @@ export default defineContentScript({
                             r.entry.id
                         );
 
-                        // Insert After
+                        // Insert After first (order matters when inserting multiple siblings)
                         if (after) {
                             node.parentNode?.insertBefore(document.createTextNode(after), node.nextSibling);
                         }
+                        
+                        // Insert Space if needed (Between current word and next word)
+                        if (addSpace) {
+                            node.parentNode?.insertBefore(document.createTextNode(" "), node.nextSibling);
+                        }
+
+                        // Insert Replacement
                         node.parentNode?.insertBefore(span, node.nextSibling);
+                        
+                        // Update remaining text in original node
                         node.nodeValue = before;
                         
                         lastStart = r.start;
+                        lastEntry = r.entry;
                     }
                 }
             }
