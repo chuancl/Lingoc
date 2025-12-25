@@ -240,15 +240,6 @@ export default defineContentScript({
     enginesStorage.watch(v => { if(v) currentEngines = v; });
     stylesStorage.watch(v => { if(v) currentStyles = v; });
 
-    const isVerticalTransBase = (cat: WordCategory, styles: Record<WordCategory, StyleConfig>) => {
-        const s = styles[cat];
-        if (!s) return false;
-        const isVert = s.layoutMode === 'vertical';
-        const layout = s.vertical;
-        const baseline = layout.baselineTarget || 'original';
-        return isVert && baseline === 'translation';
-    };
-
     /**
      * 应用替换逻辑
      */
@@ -372,9 +363,8 @@ export default defineContentScript({
             // So if current word's END equals next word's START, they are adjacent.
             // Example: [WordA][WordB]. Processing WordA. r=WordA, last=WordB. r.end === last.start.
             if (lastEntry && r.end === lastStart) {
-                if (isVerticalTransBase(r.entry.category, currentStyles) && isVerticalTransBase(lastEntry.category, currentStyles)) {
-                    addSpace = true;
-                }
+                // Always add space between adjacent replaced words to prevent text merging
+                addSpace = true;
             }
 
             // Safety check overlap (though already filtered)
