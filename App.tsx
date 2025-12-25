@@ -162,24 +162,85 @@ const App: React.FC = () => {
 
   // --- Configuration Import Logic ---
   const handleConfigImport = async (newConfig: any) => {
-      // Update local state immediately
-      if (newConfig.general) setAutoTranslate(newConfig.general);
-      if (newConfig.styles) setStyles(newConfig.styles);
-      if (newConfig.scenarios) setScenarios(newConfig.scenarios);
-      if (newConfig.interaction) setInteractionConfig(newConfig.interaction);
-      if (newConfig.pageWidget) setPageWidgetConfig(newConfig.pageWidget);
-      if (newConfig.engines) setEngines(newConfig.engines);
-      if (newConfig.anki) setAnkiConfig(newConfig.anki);
-
-      // FORCE save to storage immediately to prevent race condition with reload
       const promises = [];
-      if (newConfig.general) promises.push(autoTranslateConfigStorage.setValue(newConfig.general));
-      if (newConfig.styles) promises.push(stylesStorage.setValue(newConfig.styles));
-      if (newConfig.scenarios) promises.push(scenariosStorage.setValue(newConfig.scenarios));
-      if (newConfig.interaction) promises.push(interactionConfigStorage.setValue(newConfig.interaction));
-      if (newConfig.pageWidget) promises.push(pageWidgetConfigStorage.setValue(newConfig.pageWidget));
-      if (newConfig.engines) promises.push(enginesStorage.setValue(newConfig.engines));
-      if (newConfig.anki) promises.push(ankiConfigStorage.setValue(newConfig.anki));
+
+      // 1. General (Deep Merge)
+      if (newConfig.general) {
+          const merged = { ...DEFAULT_AUTO_TRANSLATE, ...newConfig.general };
+          setAutoTranslate(merged);
+          promises.push(autoTranslateConfigStorage.setValue(merged));
+      }
+
+      // 2. Styles (Deep Merge per Category)
+      if (newConfig.styles) {
+          const mergedStyles = { ...DEFAULT_STYLES };
+          Object.keys(newConfig.styles).forEach(key => {
+              const cat = key as WordCategory;
+              if (mergedStyles[cat]) {
+                  mergedStyles[cat] = {
+                      ...mergedStyles[cat],
+                      ...newConfig.styles[cat],
+                      // Deep merge critical nested objects to avoid "undefined" errors
+                      originalText: { ...mergedStyles[cat].originalText, ...(newConfig.styles[cat].originalText || {}) },
+                      horizontal: { ...mergedStyles[cat].horizontal, ...(newConfig.styles[cat].horizontal || {}) },
+                      vertical: { ...mergedStyles[cat].vertical, ...(newConfig.styles[cat].vertical || {}) },
+                  };
+              }
+          });
+          setStyles(mergedStyles);
+          promises.push(stylesStorage.setValue(mergedStyles));
+      }
+
+      // 3. Scenarios (Replace)
+      if (newConfig.scenarios && Array.isArray(newConfig.scenarios)) {
+          setScenarios(newConfig.scenarios);
+          promises.push(scenariosStorage.setValue(newConfig.scenarios));
+      }
+
+      // 4. Interaction (Deep Merge)
+      if (newConfig.interaction) {
+          const merged = { ...DEFAULT_WORD_INTERACTION, ...newConfig.interaction };
+          setInteractionConfig(merged);
+          promises.push(interactionConfigStorage.setValue(merged));
+      }
+
+      // 5. Page Widget (Deep Merge - Critical for showSections)
+      if (newConfig.pageWidget) {
+          const base = DEFAULT_PAGE_WIDGET;
+          const imported = newConfig.pageWidget;
+          const merged: PageWidgetConfig = {
+              ...base,
+              ...imported,
+              // Ensure nested objects exist by merging with base
+              modalPosition: { ...base.modalPosition, ...(imported.modalPosition || {}) },
+              modalSize: { ...base.modalSize, ...(imported.modalSize || {}) },
+              showSections: { ...base.showSections, ...(imported.showSections || {}) },
+              // For arrays, prefer imported if valid, else default
+              cardDisplay: (imported.cardDisplay && imported.cardDisplay.length) ? imported.cardDisplay : base.cardDisplay
+          };
+          setPageWidgetConfig(merged);
+          promises.push(pageWidgetConfigStorage.setValue(merged));
+      }
+
+      // 6. Engines (Replace if valid array)
+      if (newConfig.engines && Array.isArray(newConfig.engines)) {
+          setEngines(newConfig.engines);
+          promises.push(enginesStorage.setValue(newConfig.engines));
+      }
+
+      // 7. Anki (Deep Merge - Critical for templates)
+      if (newConfig.anki) {
+          const base = DEFAULT_ANKI_CONFIG;
+          const imported = newConfig.anki;
+          const merged: AnkiConfig = {
+              ...base,
+              ...imported,
+              syncScope: { ...base.syncScope, ...(imported.syncScope || {}) },
+              templates: { ...base.templates, ...(imported.templates || {}) }
+          };
+          setAnkiConfig(merged);
+          promises.push(ankiConfigStorage.setValue(merged));
+      }
       
       await Promise.all(promises);
   };

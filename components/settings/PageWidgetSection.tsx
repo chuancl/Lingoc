@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { PageWidgetConfig } from '../../types';
 import { GripVertical, PlayCircle, BarChart2, Star } from 'lucide-react';
@@ -38,6 +39,9 @@ export const PageWidgetSection: React.FC<PageWidgetSectionProps> = ({ widget, se
        window.open(url, '_blank');
    };
 
+   // Default fallback for showSections to ensure type safety
+   const defaultSections = { known: false, want: true, learning: true };
+
    return (
       <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300">
         <div className="p-6 border-b border-slate-200 flex justify-between items-center">
@@ -69,15 +73,15 @@ export const PageWidgetSection: React.FC<PageWidgetSectionProps> = ({ widget, se
                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">弹窗包含的词汇类型</h3>
                    <div className="space-y-3">
                       <label className="flex items-center">
-                         <input type="checkbox" checked={widget.showSections.want} onChange={e => setWidget({...widget, showSections: {...widget.showSections, want: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
+                         <input type="checkbox" checked={widget.showSections?.want ?? true} onChange={e => setWidget({...widget, showSections: {...(widget.showSections || defaultSections), want: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
                          <span className="text-sm">想学习 (Want to Learn)</span>
                       </label>
                       <label className="flex items-center">
-                         <input type="checkbox" checked={widget.showSections.learning} onChange={e => setWidget({...widget, showSections: {...widget.showSections, learning: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
+                         <input type="checkbox" checked={widget.showSections?.learning ?? true} onChange={e => setWidget({...widget, showSections: {...(widget.showSections || defaultSections), learning: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
                          <span className="text-sm">正在学 (Learning)</span>
                       </label>
                       <label className="flex items-center">
-                         <input type="checkbox" checked={widget.showSections.known} onChange={e => setWidget({...widget, showSections: {...widget.showSections, known: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
+                         <input type="checkbox" checked={widget.showSections?.known ?? false} onChange={e => setWidget({...widget, showSections: {...(widget.showSections || defaultSections), known: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
                          <span className="text-sm">已掌握 (Mastered)</span>
                       </label>
                    </div>
@@ -124,7 +128,7 @@ export const PageWidgetSection: React.FC<PageWidgetSectionProps> = ({ widget, se
 
                    <p className="text-[10px] text-slate-400 mb-2">* 以下例句内容可拖拽排序</p>
                    <div className="space-y-2">
-                       {widget.cardDisplay.map((item, index) => (
+                       {widget.cardDisplay && widget.cardDisplay.map((item, index) => (
                           <div 
                              key={item.id}
                              draggable
@@ -199,7 +203,7 @@ export const PageWidgetSection: React.FC<PageWidgetSectionProps> = ({ widget, se
                          </div>
 
                          <div className="space-y-3">
-                            {widget.cardDisplay.map(item => {
+                            {widget.cardDisplay && widget.cardDisplay.map(item => {
                                 if (!item.enabled) return null;
                                 if (item.id === 'context') return (
                                    <div key="ctx" className="bg-slate-50 p-3.5 rounded-lg border border-slate-100 relative">
@@ -216,7 +220,6 @@ export const PageWidgetSection: React.FC<PageWidgetSectionProps> = ({ widget, se
                                       <p className="text-sm text-slate-700 leading-relaxed pl-2">时尚本质上是 ephemeral (短暂) 的。</p>
                                    </div>
                                 );
-                                /* 修复: item.id 为 dictExample，非 dictionary */
                                 if (item.id === 'dictExample') return (
                                    <div key="dict" className="bg-slate-50 p-3.5 rounded-lg border border-slate-100 relative">
                                       <div className="absolute left-0 top-3 w-1 h-8 bg-emerald-500 rounded-r"></div>
