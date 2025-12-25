@@ -1,6 +1,7 @@
 
 import { WordCategory, StyleConfig, OriginalTextConfig } from "../types";
 import { getStyleStr } from "./style-helper";
+import { DEFAULT_STYLE } from "../constants";
 
 /**
  * Builds the HTML string for a replaced word, applying layout and styles.
@@ -14,8 +15,15 @@ export const buildReplacementHtml = (
     originalTextConfig: OriginalTextConfig,
     entryId: string
 ): string => {
-    const transStyle = styles[category];
-    const origTextStyle = transStyle.originalText; // Use the per-category original text style
+    // Use fallback if style for category is missing
+    const transStyle = styles[category] || DEFAULT_STYLE;
+    
+    // Robust Fallback: Ensure originalText object exists and has defaults
+    // This fixes the issue where old storage data (pre-update) causes undefined styles
+    const rawOrig = transStyle.originalText;
+    const origTextStyle = rawOrig 
+        ? { ...DEFAULT_STYLE.originalText, ...rawOrig }
+        : DEFAULT_STYLE.originalText;
     
     // Read layout from the category specific style config
     const activeLayout = transStyle.layoutMode === 'horizontal' ? transStyle.horizontal : transStyle.vertical;
@@ -34,7 +42,7 @@ export const buildReplacementHtml = (
 
     // Style Overrides for Vertical Alignment
     const transBaseStyle = getStyleStr(transStyle);
-    const origBaseStyle = getStyleStr(origTextStyle); // Pass the VisualStyle object
+    const origBaseStyle = getStyleStr(origTextStyle); // Pass the merged VisualStyle object
 
     let transOverride = '';
     let origOverride = '';
