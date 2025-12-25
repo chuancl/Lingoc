@@ -167,7 +167,8 @@ const App: React.FC = () => {
   };
 
   // --- Configuration Import Logic ---
-  const handleConfigImport = (newConfig: any) => {
+  const handleConfigImport = async (newConfig: any) => {
+      // Update local state immediately
       if (newConfig.general) setAutoTranslate(newConfig.general);
       if (newConfig.styles) setStyles(newConfig.styles);
       if (newConfig.scenarios) setScenarios(newConfig.scenarios);
@@ -175,6 +176,18 @@ const App: React.FC = () => {
       if (newConfig.pageWidget) setPageWidgetConfig(newConfig.pageWidget);
       if (newConfig.engines) setEngines(newConfig.engines);
       if (newConfig.anki) setAnkiConfig(newConfig.anki);
+
+      // FORCE save to storage immediately to prevent race condition with reload
+      const promises = [];
+      if (newConfig.general) promises.push(autoTranslateConfigStorage.setValue(newConfig.general));
+      if (newConfig.styles) promises.push(stylesStorage.setValue(newConfig.styles));
+      if (newConfig.scenarios) promises.push(scenariosStorage.setValue(newConfig.scenarios));
+      if (newConfig.interaction) promises.push(interactionConfigStorage.setValue(newConfig.interaction));
+      if (newConfig.pageWidget) promises.push(pageWidgetConfigStorage.setValue(newConfig.pageWidget));
+      if (newConfig.engines) promises.push(enginesStorage.setValue(newConfig.engines));
+      if (newConfig.anki) promises.push(ankiConfigStorage.setValue(newConfig.anki));
+      
+      await Promise.all(promises);
   };
 
   // Bundle current configs for export

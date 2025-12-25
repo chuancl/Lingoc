@@ -6,7 +6,7 @@ import { Toast, ToastMessage } from '../ui/Toast';
 
 interface ConfigManagementSectionProps {
     currentConfigs: any;
-    onImport: (newConfigs: any) => void;
+    onImport: (newConfigs: any) => Promise<void>;
 }
 
 export const ConfigManagementSection: React.FC<ConfigManagementSectionProps> = ({ currentConfigs, onImport }) => {
@@ -40,7 +40,7 @@ export const ConfigManagementSection: React.FC<ConfigManagementSectionProps> = (
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
             try {
                 const text = event.target?.result as string;
                 const parsed = parseConfigYaml(text);
@@ -59,10 +59,10 @@ export const ConfigManagementSection: React.FC<ConfigManagementSectionProps> = (
                 }
 
                 if (confirm('导入配置将覆盖当前的所有设置（不含词汇数据），确定继续吗？')) {
-                    onImport(parsed);
+                    await onImport(parsed);
                     showToast('配置导入成功！页面将刷新以应用更改。', 'success');
-                    // Optional: reload page to ensure clean state application if deep styles changed
-                    setTimeout(() => window.location.reload(), 1500);
+                    // Reload to ensure all components re-mount with new config
+                    setTimeout(() => window.location.reload(), 1000);
                 }
             } catch (err: any) {
                 console.error(err);

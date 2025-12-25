@@ -160,11 +160,6 @@ const dumpObject = (obj: any, level: number, metadata: FieldMetadata[] = [], isL
         }
 
         const prefix = (isListItem && index === 0) ? '' : indent(level);
-        
-        // Special handling for nested complex objects that don't have direct metadata passed but might need recursion
-        // For simple recursion, we won't pass metadata down unless specific known structures.
-        // For top level configs, we will control the call.
-        
         output += `${prefix}${key}: ${dumpValue(val, level)}\n`;
     });
     return output;
@@ -179,9 +174,6 @@ export const generateConfigYaml = (fullConfig: any): string => {
 
     // 2. Styles
     yaml += `\n# ==================================================\n# 2. 视觉样式 (Visual Styles)\n# ==================================================\n`;
-    // Styles is a Record<Category, Config>, treat as object but apply generic style fields to sub-objects?
-    // We can't easily map dynamic keys. We will just dump it, but maybe add comments to known sub-keys if possible.
-    // Actually, we can hardcode the categories for comments if we want perfectly nice output.
     yaml += `styles:\n`;
     Object.keys(fullConfig.styles).forEach(cat => {
         yaml += `  # 类别: ${cat}\n  "${cat}":\n${dumpObject(fullConfig.styles[cat], 2, styleFields)}`;
@@ -221,69 +213,39 @@ export const generateConfigYaml = (fullConfig: any): string => {
 // --------------------------------------------------------------------------------
 
 /**
- * A very basic YAML parser for our generated format.
- * Supports:
- * - Key: Value
- * - Nested objects via indentation
- * - Lists via '-'
- * - Comments #
- * - Inline arrays [a, b]
+ * Parses YAML securely, correctly handling inline comments and quoted strings containing #.
  */
 export const parseConfigYaml = (yaml: string): any => {
-    const lines = yaml.split('\n');
-    const root: any = {};
-    const stack: { obj: any; indent: number; key?: string | number }[] = [{ obj: root, indent: -1 }];
-
-    for (let line of lines) {
-        // Strip comments
-        const commentIndex = line.indexOf('#');
-        if (commentIndex !== -1) {
-            // Be careful not to strip # inside quotes, but for simplicity assuming standard config
-            line = line.substring(0, commentIndex);
-        }
+    // Pre-process lines to strip comments safely
+    const lines = yaml.split('\n').map(rawLine => {
+        let inQuote = false;
+        let quoteChar = '';
         
-        if (!line.trim()) continue;
-
-        const indentLevel = line.search(/\S/);
-        const content = line.trim();
-
-        // List item
-        if (content.startsWith('- ')) {
-            // Ensure parent is an array
-            let parent = stack[stack.length - 1];
-            while (parent.indent >= indentLevel) {
-                stack.pop();
-                parent = stack[stack.length - 1];
+        for (let i = 0; i < rawLine.length; i++) {
+            const char = rawLine[i];
+            
+            // Toggle quote state
+            if (char === '"' || char === "'") {
+                if (!inQuote) {
+                    inQuote = true;
+                    quoteChar = char;
+                } else if (char === quoteChar) {
+                    // Check for escape char preceding quote
+                    if (i === 0 || rawLine[i-1] !== '\\') {
+                        inQuote = false;
+                    }
+                }
             }
-
-            // The list itself might be the value of a previous key
-            // Or we are inside a list of objects
             
-            // Simplified handling: We expect standard structure.
-            // If parent.obj is object, and we encounter '-', it's invalid unless key was defined previously?
-            // Actually, in our format, lists are values of keys. e.g. "scenarios:" then "- name: ..."
-            
-            // If the parent object IS an array, we push a new item.
-            // If the parent object is a generic object, and we see -, it usually means we just defined a key that holds an array.
-            
-            // Let's rely on the previous key context.
-            // This basic parser is tricky. 
-            // Alternative: Assume strict structure matching our generator.
-            
-            // Let's use a simpler recursion based on lines if possible, or RegEx.
-            // Given the complexity of writing a robust YAML parser from scratch,
-            // and the requirement to support user edits, this is the fragile part.
-            
-            // Strategy: Convert strict indentation to JSON structure.
+            // If # found outside quotes, truncate line
+            if (char === '#' && !inQuote) {
+                return rawLine.substring(0, i);
+            }
         }
-    }
-    
-    // Fallback: Since writing a full parser is error prone, and user wants "YAML format",
-    // I will implement a "Simple Key-Value Hierarchy" parser.
-    
-    // We will parse recursively.
-    
-    return parseLines(lines.filter(l => l.trim() && !l.trim().startsWith('#')), 0).result;
+        return rawLine;
+    }).filter(l => l.trim().length > 0);
+
+    return parseLines(lines, 0).result;
 };
 
 const parseLines = (lines: string[], currentIndent: number): { result: any, consumed: number } => {
@@ -301,7 +263,7 @@ const parseLines = (lines: string[], currentIndent: number): { result: any, cons
         }
 
         if (indent > currentIndent) {
-            // Should not happen if logic is correct, handled by recursion call
+            // Unexpected deep indent, skip to next line to recover
             i++; 
             continue;
         }
@@ -314,14 +276,10 @@ const parseLines = (lines: string[], currentIndent: number): { result: any, cons
             const valPart = content.substring(1).trim();
             
             if (valPart) {
-                // Inline value or start of object
                 if (valPart.includes(': ')) {
-                    // Object starting on same line: "- name: foo"
-                    // Treat as block
-                    // Adjust line to remove '- ' and parse as object block with same indent
+                    // Object inside list: "- name: foo"
+                    // Treat "- " as indent for the block
                     const cleanLine = ' '.repeat(indent) + valPart;
-                    // We need to gather lines belonging to this item
-                    // look ahead
                     let blockLines = [cleanLine];
                     let j = i + 1;
                     while(j < lines.length) {
@@ -344,8 +302,6 @@ const parseLines = (lines: string[], currentIndent: number): { result: any, cons
                     continue;
                 }
             } else {
-                // Object block starts on next line? Or empty?
-                // Not standard in our generator, skip complex case
                 i++;
                 continue;
             }
@@ -354,7 +310,7 @@ const parseLines = (lines: string[], currentIndent: number): { result: any, cons
         // Key-Value
         const colonIndex = content.indexOf(':');
         if (colonIndex !== -1) {
-            const key = content.substring(0, colonIndex).trim().replace(/^"|"$/g, '');
+            const key = content.substring(0, colonIndex).trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
             const valStr = content.substring(colonIndex + 1).trim();
 
             if (valStr) {
@@ -362,7 +318,6 @@ const parseLines = (lines: string[], currentIndent: number): { result: any, cons
                 i++;
             } else {
                 // Nested Block
-                // Gather children
                 let blockLines: string[] = [];
                 let j = i + 1;
                 while (j < lines.length) {
@@ -375,7 +330,6 @@ const parseLines = (lines: string[], currentIndent: number): { result: any, cons
                     }
                 }
                 
-                // Determine child indent
                 if (blockLines.length > 0) {
                     const childIndent = blockLines[0].search(/\S/);
                     const parsedChild = parseLines(blockLines, childIndent).result;
@@ -386,7 +340,6 @@ const parseLines = (lines: string[], currentIndent: number): { result: any, cons
                 i = j;
             }
         } else {
-            // Malformed line?
             i++;
         }
     }
@@ -398,7 +351,9 @@ const parseValue = (val: string): any => {
     if (val === 'true') return true;
     if (val === 'false') return false;
     if (val === 'null') return null;
-    if (!isNaN(Number(val)) && !val.includes('"') && !val.includes("'")) return Number(val);
+    
+    // Numbers
+    if (!isNaN(Number(val)) && !val.includes('"') && !val.includes("'") && val !== '') return Number(val);
     
     // Inline Array [a, b]
     if (val.startsWith('[') && val.endsWith(']')) {
