@@ -26,7 +26,7 @@ const DEFAULT_ORIGINAL_STYLE: VisualStyle = {
     isBold: false,
     isItalic: false,
     underlineStyle: 'none',
-    underlineColor: 'transparent',
+    underlineColor: '#94a3b8', // Updated from transparent to visible default
     underlineOffset: '0px',
     backgroundColor: 'transparent'
 };

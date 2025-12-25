@@ -16,7 +16,12 @@ export interface VisualStyle {
  * Used for inline styles in Content Script and potentially elsewhere.
  */
 export const getStyleStr = (config: VisualStyle): string => {
-    const decor = config.underlineStyle !== 'none' ? `${config.underlineStyle} ${config.underlineColor}` : 'none';
+    // Correctly format text-decoration shorthand: line style color
+    // e.g., "underline solid red" or "none"
+    const decor = config.underlineStyle !== 'none' 
+        ? `underline ${config.underlineStyle} ${config.underlineColor}` 
+        : 'none';
+
     return `
         color: ${config.color};
         background-color: ${config.backgroundColor};

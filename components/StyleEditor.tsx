@@ -222,15 +222,31 @@ export const VisualStylesSection: React.FC<VisualStylesSectionProps> = ({ styles
           </div>
           
           <div className="pt-2 border-t border-slate-100 mt-2">
-              <label className="text-xs text-slate-500 block mb-1">下划线样式</label>
-              <select value={config.underlineStyle} onChange={(e) => onChange('underlineStyle', e.target.value)} className="w-full text-xs border-slate-300 rounded">
-                  <option value="none">无</option>
-                  <option value="solid">实线</option>
-                  <option value="dashed">虚线</option>
-                  <option value="dotted">点线</option>
-                  <option value="double">双线</option>
-                  <option value="wavy">波浪线</option>
-              </select>
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                      <label className="text-xs text-slate-500 block mb-1">下划线样式</label>
+                      <select value={config.underlineStyle} onChange={(e) => onChange('underlineStyle', e.target.value)} className="w-full text-xs border-slate-300 rounded">
+                          <option value="none">无</option>
+                          <option value="solid">实线</option>
+                          <option value="dashed">虚线</option>
+                          <option value="dotted">点线</option>
+                          <option value="double">双线</option>
+                          <option value="wavy">波浪线</option>
+                      </select>
+                  </div>
+                  <div>
+                      <label className="text-xs text-slate-500 block mb-1">下划线颜色</label>
+                      <div className="flex items-center space-x-2">
+                          <input 
+                            type="color" 
+                            value={config.underlineColor === 'transparent' ? '#000000' : config.underlineColor} 
+                            onChange={(e) => onChange('underlineColor', e.target.value)} 
+                            className="w-8 h-8 rounded border cursor-pointer" 
+                            disabled={config.underlineStyle === 'none'}
+                          />
+                      </div>
+                  </div>
+              </div>
           </div>
           <div>
               <label className="text-xs text-slate-500 block mb-1">下划线偏移 ({config.underlineOffset})</label>
@@ -463,7 +479,7 @@ export const VisualStylesSection: React.FC<VisualStylesSectionProps> = ({ styles
                                <span className="text-xs font-bold text-slate-500">对齐基准 (ALIGNMENT TARGET)</span>
                             </div>
                             <div className="flex gap-2">
-                               <button 
+                                <button 
                                  onClick={() => updateLayoutConfig('vertical', 'baselineTarget', 'original')}
                                  className={`flex-1 py-1.5 text-xs rounded border transition-colors ${currentTranslationStyle.vertical.baselineTarget !== 'translation' ? 'bg-blue-50 border-blue-200 text-blue-600 font-bold' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
                                >
