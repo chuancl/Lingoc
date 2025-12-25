@@ -480,7 +480,12 @@ export default defineContentScript({
                 if (['SCRIPT','STYLE','NOSCRIPT','IFRAME','CANVAS','VIDEO','AUDIO','BUTTON','INPUT','TEXTAREA','SELECT'].includes(tagName)) return NodeFilter.FILTER_REJECT;
                 
                 // 2. 内部 UI 剔除
-                if (n.hasAttribute('data-context-lingo-scanned') || n.closest('[data-context-lingo-container]')) return NodeFilter.FILTER_REJECT;
+                // 修复：排除插件生成的双语对照块，防止递归翻译
+                if (n.hasAttribute('data-context-lingo-scanned') || 
+                    n.closest('[data-context-lingo-container]') ||
+                    n.classList?.contains('context-lingo-bilingual-block') ||
+                    n.closest('.context-lingo-bilingual-block')
+                ) return NodeFilter.FILTER_REJECT;
                 
                 // 3. 结构性过滤：非全页扫描时剔除干扰容器
                 if (!currentAutoTranslate.translateWholePage) {
