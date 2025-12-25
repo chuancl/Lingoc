@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { AnkiConfig, WordEntry, WordCategory } from '../../types';
 import { RefreshCw, Wifi, Info, PlusCircle, Layers, Calendar, Code, Eye, BookOpen, X, Copy, Lock, Unlock, AlertCircle, Download } from 'lucide-react';
@@ -256,7 +255,7 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
   };
 
   const generateCardContent = (entry: WordEntry, template: string) => {
-      let content = template;
+      let content = template || "";
       const generateListHtml = (items: {text: string, trans: string}[], title: string) => {
           if (!items || items.length === 0) return '';
           return `<div class="info-list"><b>${title}:</b> <ul>${items.map(i => `<li>${i.text} <span style="opacity:0.7">(${i.trans})</span></li>`).join('')}</ul></div>`;
@@ -332,7 +331,7 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
               if (words.length === 0) return { added: 0, skipped: 0 };
               const notesPayload = words.map(entry => ({
                   deckName: deckName, modelName: TARGET_MODEL_NAME, 
-                  fields: { Front: generateCardContent(entry, config.templates.frontTemplate), Back: generateCardContent(entry, config.templates.backTemplate) },
+                  fields: { Front: generateCardContent(entry, config.templates?.frontTemplate || ''), Back: generateCardContent(entry, config.templates?.backTemplate || '') },
                   tags: ['ContextLingo', ...(entry.tags || [])],
                   options: { allowDuplicate: false, duplicateScope: "deck" }
               }));
@@ -430,9 +429,19 @@ export const AnkiSection: React.FC<AnkiSectionProps> = ({ config, setConfig, ent
            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="flex flex-col h-full">
                     <div className="flex items-center justify-between mb-4 h-[42px]"><h3 className="text-sm font-bold text-slate-800 flex items-center"><Code className="w-4 h-4 mr-2 text-slate-500"/> 卡片模板编辑器</h3><button onClick={() => setShowVarHelp(true)} className="flex items-center text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg shadow-sm shadow-blue-200 transition"><BookOpen className="w-4 h-4 mr-2"/> 变量参考</button></div>
-                    <div className="flex flex-col bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden flex-1 min-h-[500px]"><div className="bg-slate-50 border-b border-slate-200 p-2 flex items-center gap-1"><button onClick={() => setActiveTemplate('front')} className={`px-6 py-2 text-xs font-bold rounded-lg transition ${activeTemplate === 'front' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-slate-100'}`}>正面 (Front)</button><button onClick={() => setActiveTemplate('back')} className={`px-6 py-2 text-xs font-bold rounded-lg transition ${activeTemplate === 'back' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-slate-100'}`}>背面 (Back)</button></div><div className="flex-1 relative group"><textarea className="w-full h-full p-4 font-mono text-sm text-slate-800 bg-white resize-none focus:outline-none focus:bg-slate-50/30 transition-colors leading-relaxed" value={activeTemplate === 'front' ? config.templates.frontTemplate : config.templates.backTemplate} onChange={(e) => setConfig({...config, templates: {...config.templates, [activeTemplate === 'front' ? 'frontTemplate' : 'backTemplate']: e.target.value}})} spellCheck={false} placeholder="在此输入 HTML 模板代码..."/></div></div>
+                    <div className="flex flex-col bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden flex-1 min-h-[500px]"><div className="bg-slate-50 border-b border-slate-200 p-2 flex items-center gap-1"><button onClick={() => setActiveTemplate('front')} className={`px-6 py-2 text-xs font-bold rounded-lg transition ${activeTemplate === 'front' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-slate-100'}`}>正面 (Front)</button><button onClick={() => setActiveTemplate('back')} className={`px-6 py-2 text-xs font-bold rounded-lg transition ${activeTemplate === 'back' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:bg-slate-100'}`}>背面 (Back)</button></div><div className="flex-1 relative group"><textarea className="w-full h-full p-4 font-mono text-sm text-slate-800 bg-white resize-none focus:outline-none focus:bg-slate-50/30 transition-colors leading-relaxed" value={activeTemplate === 'front' ? (config.templates?.frontTemplate || '') : (config.templates?.backTemplate || '')} onChange={(e) => {
+                        const val = e.target.value;
+                        const current = config.templates || { frontTemplate: '', backTemplate: '' };
+                        setConfig({
+                            ...config,
+                            templates: {
+                                frontTemplate: activeTemplate === 'front' ? val : (current.frontTemplate || ''),
+                                backTemplate: activeTemplate === 'back' ? val : (current.backTemplate || '')
+                            }
+                        });
+                    }} spellCheck={false} placeholder="在此输入 HTML 模板代码..."/></div></div>
                 </div>
-                <div className="flex flex-col h-full"><div className="flex items-center justify-between mb-4 h-[42px]"><h3 className="text-sm font-bold text-slate-800 flex items-center"><Eye className="w-4 h-4 mr-2 text-slate-500"/> 卡片效果预览 ({activeTemplate === 'front' ? 'Front' : 'Back'})</h3><span className="text-[10px] bg-slate-100 px-2 py-1 rounded border border-slate-200 text-slate-400">Mock Data</span></div><div className="bg-slate-200/50 rounded-xl border border-slate-300 shadow-inner overflow-hidden flex flex-col flex-1 min-h-[500px]"><div className="p-6 overflow-y-auto flex-1 flex justify-center items-start"><div className="bg-white rounded-lg shadow-lg border border-slate-200 p-0 min-w-[320px] max-w-[400px] w-full prose prose-sm overflow-hidden relative break-words"><div dangerouslySetInnerHTML={{ __html: generateCardContent(previewEntry, activeTemplate === 'front' ? config.templates.frontTemplate : config.templates.backTemplate) }} /></div></div></div></div>
+                <div className="flex flex-col h-full"><div className="flex items-center justify-between mb-4 h-[42px]"><h3 className="text-sm font-bold text-slate-800 flex items-center"><Eye className="w-4 h-4 mr-2 text-slate-500"/> 卡片效果预览 ({activeTemplate === 'front' ? 'Front' : 'Back'})</h3><span className="text-[10px] bg-slate-100 px-2 py-1 rounded border border-slate-200 text-slate-400">Mock Data</span></div><div className="bg-slate-200/50 rounded-xl border border-slate-300 shadow-inner overflow-hidden flex flex-col flex-1 min-h-[500px]"><div className="p-6 overflow-y-auto flex-1 flex justify-center items-start"><div className="bg-white rounded-lg shadow-lg border border-slate-200 p-0 min-w-[320px] max-w-[400px] w-full prose prose-sm overflow-hidden relative break-words"><div dangerouslySetInnerHTML={{ __html: generateCardContent(previewEntry, activeTemplate === 'front' ? (config.templates?.frontTemplate || '') : (config.templates?.backTemplate || '')) }} /></div></div></div></div>
            </div>
         </div>
         {showVarHelp && (

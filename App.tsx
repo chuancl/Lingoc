@@ -86,19 +86,13 @@ const App: React.FC = () => {
       ]);
       
       // Data Migration: Anki Config
-      let finalAnkiConfig = ank;
-      if (!finalAnkiConfig.deckNameWant || !finalAnkiConfig.deckNameLearning) {
-          finalAnkiConfig = {
-              ...DEFAULT_ANKI_CONFIG, 
-              ...ank, 
-              deckNameWant: ank.deckNameWant || DEFAULT_ANKI_CONFIG.deckNameWant,
-              deckNameLearning: ank.deckNameLearning || DEFAULT_ANKI_CONFIG.deckNameLearning,
-              syncScope: ank.syncScope || DEFAULT_ANKI_CONFIG.syncScope
-          };
-          const oldDeckName = (ank as any).deckName;
-          if (oldDeckName && !finalAnkiConfig.deckNameLearning) {
-             finalAnkiConfig.deckNameLearning = oldDeckName;
-          }
+      // Always merge with DEFAULT to ensure new fields (like templates) are populated if missing in storage
+      let finalAnkiConfig = { ...DEFAULT_ANKI_CONFIG, ...ank };
+      
+      // Handle legacy deck name migration (if user had old single deck config)
+      const oldDeckName = (ank as any).deckName;
+      if (oldDeckName && !finalAnkiConfig.deckNameLearning) {
+          finalAnkiConfig.deckNameLearning = oldDeckName;
       }
 
       // Data Migration: Style Config (Add originalText object if missing)
