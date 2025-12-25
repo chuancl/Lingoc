@@ -15,7 +15,7 @@ export const buildReplacementHtml = (
     entryId: string
 ): string => {
     const transStyle = styles[category];
-    const origStyle = originalTextConfig.style;
+    const origTextStyle = transStyle.originalText; // Use the per-category original text style
     
     // Read layout from the category specific style config
     const activeLayout = transStyle.layoutMode === 'horizontal' ? transStyle.horizontal : transStyle.vertical;
@@ -34,7 +34,7 @@ export const buildReplacementHtml = (
 
     // Style Overrides for Vertical Alignment
     const transBaseStyle = getStyleStr(transStyle);
-    const origBaseStyle = getStyleStr(origStyle);
+    const origBaseStyle = getStyleStr(origTextStyle); // Pass the VisualStyle object
 
     let transOverride = '';
     let origOverride = '';
@@ -47,7 +47,7 @@ export const buildReplacementHtml = (
             origOverride = 'line-height: 1;'; 
         } else {
             // Original is Base
-            origOverride = `line-height: normal; vertical-align: baseline; font-size: ${origStyle.fontSize};`;
+            origOverride = `line-height: normal; vertical-align: baseline; font-size: ${origTextStyle.fontSize};`;
             // Translation is RT -> Compact
             transOverride = 'line-height: 1;';
         }

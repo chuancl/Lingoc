@@ -1,4 +1,6 @@
 
+import { VisualStyle } from './utils/style-helper';
+
 export enum WordCategory {
   KnownWord = '已掌握单词',
   WantToLearnWord = '想学习单词',
@@ -23,21 +25,14 @@ export interface LayoutSpecificConfig {
   };
 }
 
-export interface StyleConfig {
-  color: string;
-  backgroundColor: string;
-  underlineStyle: 'solid' | 'dashed' | 'dotted' | 'double' | 'wavy' | 'none';
-  underlineColor: string;
-  underlineOffset: string;
-  isBold: boolean;
-  isItalic: boolean;
-  fontSize: string;
-  opacity?: number; 
-  
-  // Layout Settings (Moved from OriginalTextConfig for isolation)
+export interface StyleConfig extends VisualStyle {
+  // Layout Settings
   layoutMode: 'horizontal' | 'vertical';
   horizontal: LayoutSpecificConfig;
   vertical: LayoutSpecificConfig;
+
+  // Independent Original Text Style for this category
+  originalText: VisualStyle;
 
   // Density Settings
   densityMode: 'count' | 'percent';
@@ -46,17 +41,7 @@ export interface StyleConfig {
 
 export interface OriginalTextConfig {
   show: boolean; // Master toggle for original text visibility
-  // Layout configs moved to StyleConfig to allow per-category settings
-  style: {
-      color: string;
-      fontSize: string;
-      isBold: boolean;
-      isItalic: boolean;
-      underlineStyle: string;
-      underlineColor: string;
-      underlineOffset: string;
-      backgroundColor: string;
-  }; 
+  // Style moved to StyleConfig for per-category isolation
 }
 
 export interface PhraseItem {

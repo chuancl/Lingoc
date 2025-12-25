@@ -1,5 +1,6 @@
 
 import { StyleConfig, WordCategory, Scenario, TranslationEngine, WordInteractionConfig, PageWidgetConfig, AnkiConfig, OriginalTextConfig, MergeStrategyConfig, AutoTranslateConfig, DictionaryEngine } from './types';
+import { VisualStyle } from './utils/style-helper';
 
 // Standard layout defaults to reuse
 const DEFAULT_HORIZONTAL = {
@@ -19,7 +20,19 @@ const DEFAULT_VERTICAL = {
     }
 };
 
+const DEFAULT_ORIGINAL_STYLE: VisualStyle = {
+    color: '#94a3b8', 
+    fontSize: '0.85em',
+    isBold: false,
+    isItalic: false,
+    underlineStyle: 'none',
+    underlineColor: 'transparent',
+    underlineOffset: '0px',
+    backgroundColor: 'transparent'
+};
+
 export const DEFAULT_STYLE: StyleConfig = {
+  // Translation Style
   color: '#000000',
   backgroundColor: 'transparent',
   underlineStyle: 'none',
@@ -29,28 +42,20 @@ export const DEFAULT_STYLE: StyleConfig = {
   isItalic: false,
   fontSize: '1em',
   opacity: 1,
-  densityMode: 'percent',
-  densityValue: 100,
   
-  // Layout defaults moved here
+  // Original Text Style (Independent)
+  originalText: DEFAULT_ORIGINAL_STYLE,
+
+  // Layout & Density
   layoutMode: 'horizontal',
   horizontal: DEFAULT_HORIZONTAL,
-  vertical: DEFAULT_VERTICAL
+  vertical: DEFAULT_VERTICAL,
+  densityMode: 'percent',
+  densityValue: 100,
 };
 
 export const DEFAULT_ORIGINAL_TEXT_CONFIG: OriginalTextConfig = {
-  show: true,
-  // Layout configs removed from here, now per-category in StyleConfig
-  style: { 
-      color: '#94a3b8', 
-      fontSize: '0.85em',
-      isBold: false,
-      isItalic: false,
-      underlineStyle: 'none',
-      underlineColor: 'transparent',
-      underlineOffset: '0px',
-      backgroundColor: 'transparent'
-  }
+  show: true
 };
 
 export const DEFAULT_STYLES: Record<WordCategory, StyleConfig> = {

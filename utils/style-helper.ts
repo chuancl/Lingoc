@@ -1,13 +1,14 @@
 
-interface VisualStyle {
+export interface VisualStyle {
     color: string;
     backgroundColor: string;
     isBold: boolean;
     isItalic: boolean;
-    underlineStyle: string;
+    underlineStyle: 'solid' | 'dashed' | 'dotted' | 'double' | 'wavy' | 'none';
     underlineColor: string;
     underlineOffset: string;
     fontSize: string;
+    opacity?: number;
 }
 
 /**

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
@@ -8,7 +9,7 @@ import { PreviewSection } from './components/settings/PreviewSection';
 import { WordDetail } from './components/WordDetail'; // Import new component
 import { Loader2 } from 'lucide-react';
 import { AppView, SettingSectionId, Scenario, WordEntry, PageWidgetConfig, WordInteractionConfig, TranslationEngine, AnkiConfig, AutoTranslateConfig, StyleConfig, WordCategory, OriginalTextConfig, DictionaryEngine, WordTab } from './types';
-import { DEFAULT_STYLES, DEFAULT_ORIGINAL_TEXT_CONFIG, DEFAULT_WORD_INTERACTION, DEFAULT_PAGE_WIDGET, INITIAL_ENGINES, DEFAULT_ANKI_CONFIG, DEFAULT_AUTO_TRANSLATE, INITIAL_SCENARIOS, INITIAL_DICTIONARIES } from './constants';
+import { DEFAULT_STYLES, DEFAULT_ORIGINAL_TEXT_CONFIG, DEFAULT_WORD_INTERACTION, DEFAULT_PAGE_WIDGET, INITIAL_ENGINES, DEFAULT_ANKI_CONFIG, DEFAULT_AUTO_TRANSLATE, INITIAL_SCENARIOS, INITIAL_DICTIONARIES, DEFAULT_STYLE } from './constants';
 import { entriesStorage, scenariosStorage, pageWidgetConfigStorage, autoTranslateConfigStorage, enginesStorage, ankiConfigStorage, seedInitialData, stylesStorage, originalTextConfigStorage, interactionConfigStorage, dictionariesStorage } from './utils/storage';
 import { preloadVoices } from './utils/audio';
 
@@ -100,13 +101,24 @@ const App: React.FC = () => {
           }
       }
 
+      // Data Migration: Style Config (Add originalText object if missing)
+      const migratedStyles = { ...DEFAULT_STYLES };
+      Object.keys(sty).forEach(key => {
+          const category = key as WordCategory;
+          migratedStyles[category] = {
+              ...DEFAULT_STYLE, // Base defaults
+              ...sty[category], // User saved styles
+              originalText: sty[category].originalText || DEFAULT_STYLE.originalText // Migrate originalText
+          };
+      });
+
       setScenarios(s);
       setEntries(e);
       setPageWidgetConfig(p);
       setAutoTranslate(a);
       setEngines(eng);
       setAnkiConfig(finalAnkiConfig);
-      setStyles(sty);
+      setStyles(migratedStyles);
       setOriginalTextConfig(orig);
       setInteractionConfig(interact);
       setIsLoading(false);

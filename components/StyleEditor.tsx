@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { WordCategory, StyleConfig, OriginalTextConfig, LayoutSpecificConfig } from '../types';
 import { Bold, Italic, MoveHorizontal, MoveVertical, AlignEndHorizontal, Percent, Hash, Info, AlignVerticalJustifyCenter } from 'lucide-react';
+import { VisualStyle } from '../utils/style-helper';
 
 const Tooltip: React.FC<{ text: string; children: React.ReactNode }> = ({ text, children }) => {
   return (
@@ -37,13 +38,16 @@ export const VisualStylesSection: React.FC<VisualStylesSectionProps> = ({ styles
     });
   };
   
-  // Updates the "Original Text Style" part (color/font) which is still somewhat global but conceptually part of original text
-  const updateOriginalStyle = (key: keyof (OriginalTextConfig['style']), value: any) => {
-    onOriginalTextConfigChange({
-      ...originalTextConfig,
-      style: {
-        ...originalTextConfig.style,
-        [key]: value
+  // Updates the "Original Text Style" specifically for the active category
+  const updateOriginalStyle = (key: keyof VisualStyle, value: any) => {
+    onStylesChange({
+      ...styles,
+      [activeTab]: {
+        ...styles[activeTab],
+        originalText: {
+            ...styles[activeTab].originalText,
+            [key]: value
+        }
       }
     });
   };
@@ -129,8 +133,9 @@ export const VisualStylesSection: React.FC<VisualStylesSectionProps> = ({ styles
         </span>
     );
 
+    // Read original style from the current category config
     const OrigComponent = (
-        <span style={getStyle(originalTextConfig.style, !isTransBase)} className="whitespace-nowrap">
+        <span style={getStyle(currentTranslationStyle.originalText, !isTransBase)} className="whitespace-nowrap">
             {origPrefix}{originalText}{origSuffix}
         </span>
     );
@@ -324,7 +329,8 @@ export const VisualStylesSection: React.FC<VisualStylesSectionProps> = ({ styles
                  
                  {originalTextConfig.show ? (
                      <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
-                        <StyleControls config={originalTextConfig.style} onChange={updateOriginalStyle} />
+                        {/* Now using the per-category original text style */}
+                        <StyleControls config={currentTranslationStyle.originalText} onChange={updateOriginalStyle} />
                      </div>
                  ) : (
                     <div className="text-center py-8 text-slate-400 text-sm bg-slate-50 rounded-lg border border-dashed border-slate-200">
