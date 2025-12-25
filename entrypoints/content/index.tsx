@@ -477,7 +477,7 @@ export default defineContentScript({
             acceptNode: (n: any) => {
                 const tagName = n.tagName.toUpperCase();
                 // 1. 基础剔除标签
-                if (['SCRIPT','STYLE','NOSCRIPT','IFRAME','CANVAS','VIDEO','AUDIO','BUTTON','INPUT','TEXTAREA','SELECT'].includes(tagName)) return NodeFilter.FILTER_REJECT;
+                if (['SCRIPT','STYLE','NOSCRIPT','IFRAME','CANVAS','VIDEO','AUDIO','BUTTON','INPUT','TEXTAREA','SELECT', 'CODE', 'PRE'].includes(tagName)) return NodeFilter.FILTER_REJECT;
                 
                 // 2. 内部 UI 剔除
                 // 修复：排除插件生成的双语对照块，防止递归翻译
@@ -492,14 +492,24 @@ export default defineContentScript({
                     if (['NAV', 'HEADER', 'FOOTER', 'ASIDE'].includes(tagName)) return NodeFilter.FILTER_REJECT;
                     // 额外检测 class 和 id 中包含导航词汇的容器
                     const identity = (n.id + n.className).toLowerCase();
-                    if (['nav', 'menu', 'sidebar', 'header', 'footer', 'toolbar', 'breadcrumb'].some(word => identity.includes(word))) return NodeFilter.FILTER_REJECT;
+                    if (['nav', 'menu', 'sidebar', 'header', 'footer', 'toolbar', 'breadcrumb', 'comment'].some(word => identity.includes(word))) return NodeFilter.FILTER_REJECT;
                     // 排除被以上标签包裹的子孙元素
                     if (n.closest('nav, header, footer, aside')) return NodeFilter.FILTER_REJECT;
                 }
 
                 // 4. 接受文本容器标签
-                const textContainers = ['P','DIV','LI','ARTICLE','SECTION','BLOCKQUOTE','H1','H2','H3','H4','H5','H6'];
-                return textContainers.includes(tagName) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+                // 重要修复：仅接受“叶子”块级元素。如果容器包含其他块级子元素（如 P, DIV），则跳过父容器，深入子元素。
+                // 这能有效防止父容器和子 P 标签同时被识别、翻译和替换，从而导致内容重复。
+                const textContainers = ['P','DIV','LI','ARTICLE','SECTION','BLOCKQUOTE','H1','H2','H3','H4','H5','H6', 'TD', 'TH'];
+                if (textContainers.includes(tagName)) {
+                    const hasBlockChildren = Array.from(n.children).some((c: any) => textContainers.includes(c.tagName));
+                    if (hasBlockChildren) {
+                        return NodeFilter.FILTER_SKIP; // 跳过当前容器，继续扫描子元素
+                    }
+                    return NodeFilter.FILTER_ACCEPT; // 它是叶子块级元素，接受并处理
+                }
+
+                return NodeFilter.FILTER_SKIP;
             }
         });
         while(walker.nextNode()) scheduler.add(walker.currentNode as HTMLElement);
