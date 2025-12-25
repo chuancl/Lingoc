@@ -34,13 +34,12 @@ export const PageWidgetSection: React.FC<PageWidgetSectionProps> = ({ widget, se
 
    // 设置页面预览跳转也使用新标签页逻辑
    const handlePreviewWordClick = () => {
-       // 使用 (browser.runtime as any).getURL 修复 Property 'getURL' does not exist 错误
        const url = (browser.runtime as any).getURL('/options.html?view=word-detail&word=ephemeral');
        window.open(url, '_blank');
    };
 
-   // Default fallback for showSections to ensure type safety
-   const defaultSections = { known: false, want: true, learning: true };
+   // Robust fallback just in case the parent state is still flushing updates
+   const showSections = widget.showSections || { known: false, want: true, learning: true };
 
    return (
       <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300">
@@ -73,15 +72,15 @@ export const PageWidgetSection: React.FC<PageWidgetSectionProps> = ({ widget, se
                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">弹窗包含的词汇类型</h3>
                    <div className="space-y-3">
                       <label className="flex items-center">
-                         <input type="checkbox" checked={widget.showSections?.want ?? true} onChange={e => setWidget({...widget, showSections: {...(widget.showSections || defaultSections), want: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
+                         <input type="checkbox" checked={showSections.want ?? true} onChange={e => setWidget({...widget, showSections: {...showSections, want: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
                          <span className="text-sm">想学习 (Want to Learn)</span>
                       </label>
                       <label className="flex items-center">
-                         <input type="checkbox" checked={widget.showSections?.learning ?? true} onChange={e => setWidget({...widget, showSections: {...(widget.showSections || defaultSections), learning: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
+                         <input type="checkbox" checked={showSections.learning ?? true} onChange={e => setWidget({...widget, showSections: {...showSections, learning: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
                          <span className="text-sm">正在学 (Learning)</span>
                       </label>
                       <label className="flex items-center">
-                         <input type="checkbox" checked={widget.showSections?.known ?? false} onChange={e => setWidget({...widget, showSections: {...(widget.showSections || defaultSections), known: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
+                         <input type="checkbox" checked={showSections.known ?? false} onChange={e => setWidget({...widget, showSections: {...showSections, known: e.target.checked}})} className="rounded text-blue-600 mr-2"/>
                          <span className="text-sm">已掌握 (Mastered)</span>
                       </label>
                    </div>
@@ -89,41 +88,28 @@ export const PageWidgetSection: React.FC<PageWidgetSectionProps> = ({ widget, se
 
                 <div>
                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">卡片显示内容配置</h3>
-                   
-                   {/* Fixed Toggles */}
+                   {/* Toggles (Using direct boolean props) */}
                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      <label className="flex items-center p-2 border border-slate-100 rounded bg-slate-50 cursor-pointer hover:bg-white transition">
-                         <input type="checkbox" checked={widget.showPhonetic} onChange={e => setWidget({...widget, showPhonetic: e.target.checked})} className="rounded text-blue-600 mr-2"/>
-                         <span className="text-sm font-medium text-slate-700">显示音标</span>
-                      </label>
-                      <label className="flex items-center p-2 border border-slate-100 rounded bg-slate-50 cursor-pointer hover:bg-white transition">
-                         <input type="checkbox" checked={widget.showMeaning} onChange={e => setWidget({...widget, showMeaning: e.target.checked})} className="rounded text-blue-600 mr-2"/>
-                         <span className="text-sm font-medium text-slate-700">显示释义</span>
-                      </label>
-                      <label className="flex items-center p-2 border border-slate-100 rounded bg-slate-50 cursor-pointer hover:bg-white transition">
-                         <input type="checkbox" checked={widget.showPartOfSpeech} onChange={e => setWidget({...widget, showPartOfSpeech: e.target.checked})} className="rounded text-blue-600 mr-2"/>
-                         <span className="text-sm font-medium text-slate-700">显示词性</span>
-                      </label>
-                      <label className="flex items-center p-2 border border-slate-100 rounded bg-slate-50 cursor-pointer hover:bg-white transition">
-                         <input type="checkbox" checked={widget.showTags} onChange={e => setWidget({...widget, showTags: e.target.checked})} className="rounded text-blue-600 mr-2"/>
-                         <span className="text-sm font-medium text-slate-700">显示等级标签</span>
-                      </label>
-                      <label className="flex items-center p-2 border border-slate-100 rounded bg-slate-50 cursor-pointer hover:bg-white transition">
-                         <input type="checkbox" checked={widget.showImportance} onChange={e => setWidget({...widget, showImportance: e.target.checked})} className="rounded text-blue-600 mr-2"/>
-                         <span className="text-sm font-medium text-slate-700">显示星级</span>
-                      </label>
-                      <label className="flex items-center p-2 border border-slate-100 rounded bg-slate-50 cursor-pointer hover:bg-white transition">
-                         <input type="checkbox" checked={widget.showCocaRank} onChange={e => setWidget({...widget, showCocaRank: e.target.checked})} className="rounded text-blue-600 mr-2"/>
-                         <span className="text-sm font-medium text-slate-700">显示 COCA</span>
-                      </label>
-                      <label className="flex items-center p-2 border border-slate-100 rounded bg-slate-50 cursor-pointer hover:bg-white transition">
-                         <input type="checkbox" checked={widget.showExampleTranslation} onChange={e => setWidget({...widget, showExampleTranslation: e.target.checked})} className="rounded text-blue-600 mr-2"/>
-                         <span className="text-sm font-medium text-slate-700">显示例句翻译</span>
-                      </label>
-                      <label className="flex items-center p-2 border border-slate-100 rounded bg-slate-50 cursor-pointer hover:bg-white transition">
-                         <input type="checkbox" checked={widget.showContextTranslation} onChange={e => setWidget({...widget, showContextTranslation: e.target.checked})} className="rounded text-blue-600 mr-2"/>
-                         <span className="text-sm font-medium text-slate-700">显示原句翻译</span>
-                      </label>
+                      {[
+                          { label: '显示音标', prop: 'showPhonetic' },
+                          { label: '显示释义', prop: 'showMeaning' },
+                          { label: '显示词性', prop: 'showPartOfSpeech' },
+                          { label: '显示等级标签', prop: 'showTags' },
+                          { label: '显示星级', prop: 'showImportance' },
+                          { label: '显示 COCA', prop: 'showCocaRank' },
+                          { label: '显示例句翻译', prop: 'showExampleTranslation' },
+                          { label: '显示原句翻译', prop: 'showContextTranslation' }
+                      ].map(field => (
+                          <label key={field.prop} className="flex items-center p-2 border border-slate-100 rounded bg-slate-50 cursor-pointer hover:bg-white transition">
+                             <input 
+                                type="checkbox" 
+                                checked={!!(widget as any)[field.prop]} 
+                                onChange={e => setWidget({...widget, [field.prop]: e.target.checked})} 
+                                className="rounded text-blue-600 mr-2"
+                             />
+                             <span className="text-sm font-medium text-slate-700">{field.label}</span>
+                          </label>
+                      ))}
                    </div>
 
                    <p className="text-[10px] text-slate-400 mb-2">* 以下例句内容可拖拽排序</p>
@@ -146,7 +132,7 @@ export const PageWidgetSection: React.FC<PageWidgetSectionProps> = ({ widget, se
                 </div>
              </div>
              
-             {/* Preview of Widget Card */}
+             {/* Preview */}
              <div className="border-t border-slate-100 pt-8">
                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">列表卡片样式预览</h3>
                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-12 flex justify-center items-center">
@@ -160,48 +146,23 @@ export const PageWidgetSection: React.FC<PageWidgetSectionProps> = ({ widget, se
                                     >
                                       ephemeral
                                     </h3>
-                                    
-                                    {widget.showPartOfSpeech && (
-                                        <span className="font-serif font-bold text-sm text-slate-400 bg-slate-50 rounded px-1.5 py-0.5 border border-slate-100">adj.</span>
-                                    )}
-
+                                    {widget.showPartOfSpeech && <span className="font-serif font-bold text-sm text-slate-400 bg-slate-50 rounded px-1.5 py-0.5 border border-slate-100">adj.</span>}
                                     {widget.showPhonetic && (
                                       <div className="flex items-center text-sm text-slate-500 space-x-3 font-mono bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
                                          <span className="flex items-center"><span className="text-[10px] mr-1 text-slate-400 font-sans">US</span> /əˈfem(ə)rəl/ <PlayCircle className="w-3.5 h-3.5 ml-1 opacity-50"/></span>
                                       </div>
                                     )}
                                 </div>
-                                {widget.showMeaning && (
-                                   <div className="text-slate-700 font-medium px-3 py-1 bg-amber-50 text-amber-900 rounded-lg border border-amber-100 text-sm self-start">
-                                     短暂的；朝生暮死的
-                                   </div>
-                                )}
+                                {widget.showMeaning && <div className="text-slate-700 font-medium px-3 py-1 bg-amber-50 text-amber-900 rounded-lg border border-amber-100 text-sm self-start">短暂的；朝生暮死的</div>}
                             </div>
-
                             <div className="flex flex-col items-end gap-1.5">
-                               {widget.showTags && (
-                                   <div className="flex gap-1">
-                                       <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded border border-blue-100">GRE</span>
-                                       <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded border border-blue-100">SAT</span>
-                                   </div>
-                               )}
+                               {widget.showTags && <div className="flex gap-1"><span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded border border-blue-100">GRE</span><span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded border border-blue-100">SAT</span></div>}
                                <div className="flex items-center gap-3 text-xs text-slate-400">
-                                   {widget.showImportance && (
-                                       <div className="flex">
-                                           {[...Array(5)].map((_, i) => (
-                                               <Star key={i} className={`w-3 h-3 ${i < 2 ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
-                                           ))}
-                                       </div>
-                                   )}
-                                   {widget.showCocaRank && (
-                                       <span className="flex items-center">
-                                           <BarChart2 className="w-3 h-3 mr-1"/> #12000
-                                       </span>
-                                   )}
+                                   {widget.showImportance && <div className="flex">{[...Array(5)].map((_, i) => <Star key={i} className={`w-3 h-3 ${i < 2 ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />)}</div>}
+                                   {widget.showCocaRank && <span className="flex items-center"><BarChart2 className="w-3 h-3 mr-1"/> #12000</span>}
                                </div>
                             </div>
                          </div>
-
                          <div className="space-y-3">
                             {widget.cardDisplay && widget.cardDisplay.map(item => {
                                 if (!item.enabled) return null;

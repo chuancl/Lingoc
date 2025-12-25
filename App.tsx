@@ -6,24 +6,57 @@ import { WordManager } from './components/WordManager';
 import { VisualStylesSection } from './components/StyleEditor';
 import { ScenariosSection, EnginesSection, InteractionSection, AnkiSection, PageWidgetSection, GeneralSection, ConfigManagementSection } from './components/Settings';
 import { PreviewSection } from './components/settings/PreviewSection'; 
-import { WordDetail } from './components/WordDetail'; // Import new component
+import { WordDetail } from './components/WordDetail'; 
 import { Loader2 } from 'lucide-react';
 import { AppView, SettingSectionId, Scenario, WordEntry, PageWidgetConfig, WordInteractionConfig, TranslationEngine, AnkiConfig, AutoTranslateConfig, StyleConfig, WordCategory, OriginalTextConfig, DictionaryEngine, WordTab } from './types';
 import { DEFAULT_STYLES, DEFAULT_ORIGINAL_TEXT_CONFIG, DEFAULT_WORD_INTERACTION, DEFAULT_PAGE_WIDGET, INITIAL_ENGINES, DEFAULT_ANKI_CONFIG, DEFAULT_AUTO_TRANSLATE, INITIAL_SCENARIOS, INITIAL_DICTIONARIES, DEFAULT_STYLE } from './constants';
 import { entriesStorage, scenariosStorage, pageWidgetConfigStorage, autoTranslateConfigStorage, enginesStorage, ankiConfigStorage, seedInitialData, stylesStorage, originalTextConfigStorage, interactionConfigStorage, dictionariesStorage } from './utils/storage';
 import { preloadVoices } from './utils/audio';
 
+// --- Utility: Deep Merge for Config ---
+// Ensures that `source` merges into `target`, but if `source` lacks a key (undefined), `target`'s value is kept.
+// For Arrays: It REPLACES target with source (if source is array), unless source is empty/undefined.
+const deepMergeConfig = (defaultConfig: any, importedConfig: any): any => {
+    if (importedConfig === undefined || importedConfig === null) {
+        return defaultConfig;
+    }
+
+    if (Array.isArray(defaultConfig)) {
+        // For arrays (scenarios, engines), if import has data, use it. Otherwise keep default/current.
+        return Array.isArray(importedConfig) && importedConfig.length > 0 ? importedConfig : defaultConfig;
+    }
+
+    if (typeof defaultConfig === 'object' && defaultConfig !== null) {
+        const result: any = { ...defaultConfig };
+        Object.keys(defaultConfig).forEach(key => {
+            const defVal = defaultConfig[key];
+            const impVal = importedConfig[key];
+
+            if (typeof defVal === 'object' && defVal !== null && !Array.isArray(defVal)) {
+                // Recursively merge objects (like showSections, templates)
+                result[key] = deepMergeConfig(defVal, impVal);
+            } else if (impVal !== undefined) {
+                // Primitive values or Arrays: Use imported if present
+                result[key] = impVal;
+            }
+        });
+        // Also keep keys that are in imported but not in default (e.g. custom fields), though less critical
+        return result;
+    }
+
+    return importedConfig !== undefined ? importedConfig : defaultConfig;
+};
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>('dashboard');
   const [activeSettingSection, setActiveSettingSection] = useState<SettingSectionId | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [detailWord, setDetailWord] = useState<string>(''); // For word-detail view
+  const [detailWord, setDetailWord] = useState<string>(''); 
   
-  // State to pass down to WordManager for deep linking
   const [initialManagerTab, setInitialManagerTab] = useState<WordTab | undefined>(undefined);
   const [initialManagerSearch, setInitialManagerSearch] = useState<string>('');
 
-  // --- Persistent State from Storage ---
+  // --- Persistent State ---
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [entries, setEntries] = useState<WordEntry[]>([]);
   const [pageWidgetConfig, setPageWidgetConfig] = useState<PageWidgetConfig>(DEFAULT_PAGE_WIDGET);
@@ -35,11 +68,9 @@ const App: React.FC = () => {
   const [originalTextConfig, setOriginalTextConfig] = useState<OriginalTextConfig>(DEFAULT_ORIGINAL_TEXT_CONFIG);
   const [interactionConfig, setInteractionConfig] = useState<WordInteractionConfig>(DEFAULT_WORD_INTERACTION);
 
-  // Load data on mount
   useEffect(() => {
     preloadVoices(); 
     
-    // Check URL params for routing (e.g., from Word Bubble)
     const params = new URLSearchParams(window.location.search);
     const viewParam = params.get('view');
     const wordParam = params.get('word');
@@ -58,10 +89,8 @@ const App: React.FC = () => {
     const loadData = async () => {
       await seedInitialData();
       
-      // Forced Migration for Dictionary Priorities
       const currentDicts = await dictionariesStorage.getValue();
       const iciba = currentDicts.find(d => d.id === 'iciba');
-      
       let finalDictionaries = currentDicts;
       if (iciba && iciba.priority !== 1) {
           finalDictionaries = currentDicts.map(d => {
@@ -85,36 +114,25 @@ const App: React.FC = () => {
         interactionConfigStorage.getValue(),
       ]);
       
-      // Data Migration: Anki Config
-      // Always merge with DEFAULT to ensure new fields (like templates) are populated if missing in storage
-      let finalAnkiConfig = { ...DEFAULT_ANKI_CONFIG, ...ank };
+      // Initial Load: Merge with Defaults to ensure no missing keys from old versions
+      setScenarios(s.length ? s : INITIAL_SCENARIOS);
+      setEntries(e);
+      setPageWidgetConfig(deepMergeConfig(DEFAULT_PAGE_WIDGET, p));
+      setAutoTranslate(deepMergeConfig(DEFAULT_AUTO_TRANSLATE, a));
+      setEngines(eng.length ? eng : INITIAL_ENGINES);
+      setAnkiConfig(deepMergeConfig(DEFAULT_ANKI_CONFIG, ank));
       
-      // Handle legacy deck name migration (if user had old single deck config)
-      const oldDeckName = (ank as any).deckName;
-      if (oldDeckName && !finalAnkiConfig.deckNameLearning) {
-          finalAnkiConfig.deckNameLearning = oldDeckName;
-      }
-
-      // Data Migration: Style Config (Add originalText object if missing)
       const migratedStyles = { ...DEFAULT_STYLES };
       Object.keys(sty).forEach(key => {
           const category = key as WordCategory;
-          migratedStyles[category] = {
-              ...DEFAULT_STYLE, // Base defaults
-              ...sty[category], // User saved styles
-              originalText: sty[category].originalText || DEFAULT_STYLE.originalText // Migrate originalText
-          };
+          // Deep merge each style category
+          migratedStyles[category] = deepMergeConfig(DEFAULT_STYLE, sty[category]);
       });
-
-      setScenarios(s);
-      setEntries(e);
-      setPageWidgetConfig(p);
-      setAutoTranslate(a);
-      setEngines(eng);
-      setAnkiConfig(finalAnkiConfig);
       setStyles(migratedStyles);
-      setOriginalTextConfig(orig);
-      setInteractionConfig(interact);
+      
+      setOriginalTextConfig(deepMergeConfig(DEFAULT_ORIGINAL_TEXT_CONFIG, orig));
+      setInteractionConfig(deepMergeConfig(DEFAULT_WORD_INTERACTION, interact));
+      
       setIsLoading(false);
     };
     loadData();
@@ -153,7 +171,6 @@ const App: React.FC = () => {
     }, 100);
   };
 
-  // 跳转到详情页的处理函数
   const handleOpenWordDetail = (word: string) => {
       setDetailWord(word);
       setCurrentView('word-detail');
@@ -162,90 +179,49 @@ const App: React.FC = () => {
 
   // --- Configuration Import Logic ---
   const handleConfigImport = async (newConfig: any) => {
-      const promises = [];
+      // Use deepMergeConfig for robust importing
+      
+      const nextAutoTranslate = deepMergeConfig(DEFAULT_AUTO_TRANSLATE, newConfig.general);
+      const nextInteraction = deepMergeConfig(DEFAULT_WORD_INTERACTION, newConfig.interaction);
+      const nextPageWidget = deepMergeConfig(DEFAULT_PAGE_WIDGET, newConfig.pageWidget);
+      const nextAnki = deepMergeConfig(DEFAULT_ANKI_CONFIG, newConfig.anki);
+      
+      // Arrays: Replace if valid
+      const nextScenarios = (Array.isArray(newConfig.scenarios) && newConfig.scenarios.length > 0) 
+          ? newConfig.scenarios : scenarios;
+      const nextEngines = (Array.isArray(newConfig.engines) && newConfig.engines.length > 0)
+          ? newConfig.engines : engines;
 
-      // 1. General (Deep Merge)
-      if (newConfig.general) {
-          const merged = { ...DEFAULT_AUTO_TRANSLATE, ...newConfig.general };
-          setAutoTranslate(merged);
-          promises.push(autoTranslateConfigStorage.setValue(merged));
-      }
-
-      // 2. Styles (Deep Merge per Category)
+      // Styles
+      const nextStyles = { ...DEFAULT_STYLES };
       if (newConfig.styles) {
-          const mergedStyles = { ...DEFAULT_STYLES };
           Object.keys(newConfig.styles).forEach(key => {
               const cat = key as WordCategory;
-              if (mergedStyles[cat]) {
-                  mergedStyles[cat] = {
-                      ...mergedStyles[cat],
-                      ...newConfig.styles[cat],
-                      // Deep merge critical nested objects to avoid "undefined" errors
-                      originalText: { ...mergedStyles[cat].originalText, ...(newConfig.styles[cat].originalText || {}) },
-                      horizontal: { ...mergedStyles[cat].horizontal, ...(newConfig.styles[cat].horizontal || {}) },
-                      vertical: { ...mergedStyles[cat].vertical, ...(newConfig.styles[cat].vertical || {}) },
-                  };
-              }
+              nextStyles[cat] = deepMergeConfig(DEFAULT_STYLE, newConfig.styles[cat]);
           });
-          setStyles(mergedStyles);
-          promises.push(stylesStorage.setValue(mergedStyles));
       }
 
-      // 3. Scenarios (Replace)
-      if (newConfig.scenarios && Array.isArray(newConfig.scenarios)) {
-          setScenarios(newConfig.scenarios);
-          promises.push(scenariosStorage.setValue(newConfig.scenarios));
-      }
+      // Update State
+      setAutoTranslate(nextAutoTranslate);
+      setInteractionConfig(nextInteraction);
+      setPageWidgetConfig(nextPageWidget);
+      setAnkiConfig(nextAnki);
+      setScenarios(nextScenarios);
+      setEngines(nextEngines);
+      setStyles(nextStyles);
 
-      // 4. Interaction (Deep Merge)
-      if (newConfig.interaction) {
-          const merged = { ...DEFAULT_WORD_INTERACTION, ...newConfig.interaction };
-          setInteractionConfig(merged);
-          promises.push(interactionConfigStorage.setValue(merged));
-      }
-
-      // 5. Page Widget (Deep Merge - Critical for showSections)
-      if (newConfig.pageWidget) {
-          const base = DEFAULT_PAGE_WIDGET;
-          const imported = newConfig.pageWidget;
-          const merged: PageWidgetConfig = {
-              ...base,
-              ...imported,
-              // Ensure nested objects exist by merging with base
-              modalPosition: { ...base.modalPosition, ...(imported.modalPosition || {}) },
-              modalSize: { ...base.modalSize, ...(imported.modalSize || {}) },
-              showSections: { ...base.showSections, ...(imported.showSections || {}) },
-              // For arrays, prefer imported if valid, else default
-              cardDisplay: (imported.cardDisplay && imported.cardDisplay.length) ? imported.cardDisplay : base.cardDisplay
-          };
-          setPageWidgetConfig(merged);
-          promises.push(pageWidgetConfigStorage.setValue(merged));
-      }
-
-      // 6. Engines (Replace if valid array)
-      if (newConfig.engines && Array.isArray(newConfig.engines)) {
-          setEngines(newConfig.engines);
-          promises.push(enginesStorage.setValue(newConfig.engines));
-      }
-
-      // 7. Anki (Deep Merge - Critical for templates)
-      if (newConfig.anki) {
-          const base = DEFAULT_ANKI_CONFIG;
-          const imported = newConfig.anki;
-          const merged: AnkiConfig = {
-              ...base,
-              ...imported,
-              syncScope: { ...base.syncScope, ...(imported.syncScope || {}) },
-              templates: { ...base.templates, ...(imported.templates || {}) }
-          };
-          setAnkiConfig(merged);
-          promises.push(ankiConfigStorage.setValue(merged));
-      }
-      
-      await Promise.all(promises);
+      // Force Save
+      await Promise.all([
+          autoTranslateConfigStorage.setValue(nextAutoTranslate),
+          interactionConfigStorage.setValue(nextInteraction),
+          pageWidgetConfigStorage.setValue(nextPageWidget),
+          ankiConfigStorage.setValue(nextAnki),
+          scenariosStorage.setValue(nextScenarios),
+          enginesStorage.setValue(nextEngines),
+          stylesStorage.setValue(nextStyles)
+      ]);
   };
 
-  // Bundle current configs for export
   const currentConfigs = {
       general: autoTranslate,
       styles: styles,
@@ -260,18 +236,14 @@ const App: React.FC = () => {
     return <div className="h-screen w-full flex items-center justify-center bg-slate-50"><Loader2 className="w-8 h-8 text-blue-600 animate-spin"/></div>;
   }
 
-  // Handle Full Screen Views (like Word Detail)
   if (currentView === 'word-detail') {
       return (
           <WordDetail 
              word={detailWord} 
              onBack={() => {
-                 // If opened via URL (new tab), closing might be better or going to dashboard
                  if (window.history.length > 1) {
-                     // 尝试返回上一个视图，如果是直接打开详情，则返回 dashboard
                      setCurrentView('dashboard');
                  } else {
-                     // If it's a standalone tab opened by bubble, allow "Back" to go to dashboard too
                      setCurrentView('dashboard');
                  }
              }} 
@@ -306,7 +278,7 @@ const App: React.FC = () => {
                   ttsSpeed={autoTranslate.ttsSpeed || 1.0}
                   initialTab={initialManagerTab}
                   initialSearchQuery={initialManagerSearch}
-                  onOpenDetail={handleOpenWordDetail} // 绑定回调
+                  onOpenDetail={handleOpenWordDetail} 
                />
              </div>
           )}
