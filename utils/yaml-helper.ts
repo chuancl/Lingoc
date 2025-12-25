@@ -1,7 +1,12 @@
 
 /**
- * Simple YAML Helper for Configuration Management
- * Optimized for robustness: uses JSON-stringified values for strings to safely handle newlines/special chars.
+ * Robust YAML Helper for Configuration Management
+ * 
+ * CORE PRINCIPLE: 
+ * To ensure 100% safety with complex strings (like HTML templates in Anki config),
+ * all string values are exported using `JSON.stringify()`. 
+ * This treats them as JSON-encoded strings within YAML, effectively handling 
+ * newlines, quotes, and special characters without complex multiline YAML logic.
  */
 
 interface FieldMetadata {
@@ -95,7 +100,7 @@ const indent = (level: number) => '  '.repeat(level);
 
 /**
  * Safely dumps a value to a YAML-compatible string.
- * Uses JSON.stringify for strings to handle escaping/newlines perfectly.
+ * CRITICAL: Uses JSON.stringify for all strings to handle escaping/newlines perfectly.
  */
 const dumpValue = (value: any, level: number): string => {
     if (value === null || value === undefined) return 'null';
@@ -105,6 +110,7 @@ const dumpValue = (value: any, level: number): string => {
     if (typeof value === 'number') return value.toString();
     
     // Strings: Always use JSON.stringify to handle escapes (\n, ", etc.) safely
+    // This fixes the issue with broken Anki templates
     if (typeof value === 'string') {
         return JSON.stringify(value);
     }
@@ -112,11 +118,11 @@ const dumpValue = (value: any, level: number): string => {
     // Arrays
     if (Array.isArray(value)) {
         if (value.length === 0) return '[]';
-        // Check for simple primitives array
+        // Check for simple primitives array (e.g. blacklist)
         if (value.every(v => typeof v !== 'object')) {
             return `[${value.map(v => JSON.stringify(v)).join(', ')}]`;
         }
-        // Object array
+        // Object array (e.g. Scenarios, Engines)
         let str = '\n';
         value.forEach(item => {
             // Trim start to align dash with indentation
@@ -175,13 +181,15 @@ export const generateConfigYaml = (fullConfig: any): string => {
         if (sec.isMap) {
             // Special case for Styles map
             yaml += `${sec.key}:\n`;
-            Object.keys(val).forEach(subKey => {
-                yaml += `  "${subKey}":\n${dumpObject(val[subKey], 2, sec.meta)}`;
-            });
+            if (val) {
+                Object.keys(val).forEach(subKey => {
+                    yaml += `  "${subKey}":\n${dumpObject(val[subKey], 2, sec.meta)}`;
+                });
+            }
         } else if (sec.isArray) {
             // Arrays (Engines, Scenarios)
             yaml += `${sec.key}:\n`;
-            if (Array.isArray(val)) {
+            if (Array.isArray(val) && val.length > 0) {
                 val.forEach((item: any) => {
                     yaml += `  - ${dumpObject(item, 2, sec.meta, true).trimStart()}`;
                 });
@@ -190,7 +198,7 @@ export const generateConfigYaml = (fullConfig: any): string => {
             }
         } else {
             // Standard Objects
-            yaml += `${sec.key}:\n${dumpObject(val, 1, sec.meta)}`;
+            yaml += `${sec.key}: ${val ? '\n' + dumpObject(val, 1, sec.meta) : '{}'}\n`;
         }
     });
 
@@ -201,31 +209,13 @@ export const generateConfigYaml = (fullConfig: any): string => {
 // PARSER (IMPORT) - ROBUST IMPLEMENTATION
 // --------------------------------------------------------------------------------
 
-/**
- * A more robust recursive descent parser for our subset of YAML.
- * Safely handles:
- * - Nested objects (indentation based)
- * - Arrays of objects (dash `-`)
- * - Quoted strings with escapes (using JSON.parse)
- * - Comments (ignores lines starting with # or content after # outside quotes)
- */
 export const parseConfigYaml = (yaml: string): any => {
     const lines = yaml.split('\n');
     let currentLine = 0;
 
     const getLine = () => {
         if (currentLine >= lines.length) return null;
-        let line = lines[currentLine];
-        
-        // Remove comments (safely, simplistic approach assuming comments are at end of line or start)
-        // Note: Complex case like "color": "#FFF" is handled by regex extraction below instead of naive split
-        const commentIdx = line.indexOf('#');
-        // Only strip if # is likely a comment (not inside quotes). 
-        // For simplicity in this config format, we assume comments are usually on their own lines or clearly separated.
-        // We will strip comments during parsing of value.
-        
-        // Return raw line for indentation analysis
-        return line;
+        return lines[currentLine];
     };
 
     const countIndent = (line: string) => {
@@ -237,33 +227,28 @@ export const parseConfigYaml = (yaml: string): any => {
         valStr = valStr.trim();
         if (!valStr) return null;
         
-        // Handle Comments at end of line (e.g., true # default)
-        // But be careful with colors like "#FFF" or strings "End #1"
-        // Heuristic: If it looks like a quoted string, parse it first
-        if (valStr.startsWith('"') || valStr.startsWith("'")) {
-             try {
-                 // Try parsing as JSON string (supports escapes)
-                 // If it starts with ', replace with " for JSON compat (simple cases)
-                 if (valStr.startsWith("'")) valStr = `"${valStr.slice(1, -1).replace(/"/g, '\\"')}"`;
-                 
-                 // Find closing quote
-                 const firstQuote = valStr[0];
-                 let endQuoteIdx = -1;
-                 for (let i = 1; i < valStr.length; i++) {
-                     if (valStr[i] === firstQuote && valStr[i-1] !== '\\') {
-                         endQuoteIdx = i;
-                         break;
-                     }
-                 }
-                 if (endQuoteIdx > -1) {
-                     return JSON.parse(valStr.substring(0, endQuoteIdx + 1));
-                 }
-             } catch (e) { /* ignore */ }
+        // Remove trailing comments if not inside quotes
+        // Simple heuristic: if it contains #, split it, unless it starts with "
+        if (!valStr.startsWith('"') && !valStr.startsWith("'")) {
+             const commentIdx = valStr.indexOf('#');
+             if (commentIdx > -1) valStr = valStr.substring(0, commentIdx).trim();
         }
 
-        // Remove comments for non-quoted values
-        const commentIdx = valStr.indexOf('#');
-        if (commentIdx > -1) valStr = valStr.substring(0, commentIdx).trim();
+        // Handle Quoted Strings (JSON compatible)
+        if (valStr.startsWith('"') || valStr.startsWith("'")) {
+             try {
+                 // Normalize single quotes to double for JSON.parse if needed
+                 if (valStr.startsWith("'")) valStr = `"${valStr.slice(1, -1).replace(/"/g, '\\"')}"`;
+                 
+                 // Try to find the end of the JSON string
+                 // This is simple; for very complex mixed content it might need a real tokenizer
+                 // But since we Export using JSON.stringify, this should match.
+                 return JSON.parse(valStr);
+             } catch (e) { 
+                 // Fallback if parsing fails (e.g. not fully valid JSON)
+                 return valStr.replace(/^["']|["']$/g, '');
+             }
+        }
 
         if (valStr === 'true') return true;
         if (valStr === 'false') return false;
@@ -271,11 +256,17 @@ export const parseConfigYaml = (yaml: string): any => {
         if (valStr === '[]') return [];
         if (valStr === '{}') return {};
         
+        // Array shorthand: ["a", "b"]
+        if (valStr.startsWith('[') && valStr.endsWith(']')) {
+            try {
+                return JSON.parse(valStr);
+            } catch (e) { /* ignore */ }
+        }
+        
         const num = Number(valStr);
         if (!isNaN(num) && valStr !== '') return num;
 
-        // Fallback string
-        return valStr.replace(/^["']|["']$/g, '');
+        return valStr;
     };
 
     const parseBlock = (minIndent: number): any => {
@@ -287,7 +278,7 @@ export const parseConfigYaml = (yaml: string): any => {
             const line = getLine();
             if (line === null) break;
             
-            // Skip empty lines or full comment lines
+            // Skip empty/comment lines
             if (!line.trim() || line.trim().startsWith('#')) {
                 currentLine++;
                 continue;
@@ -295,80 +286,52 @@ export const parseConfigYaml = (yaml: string): any => {
 
             const indentLevel = countIndent(line);
             
-            // End of block
+            // End of block detection
             if (indentLevel < minIndent) {
                 break;
             }
 
             const content = line.trim();
             
-            // Array Item
+            // Array Item: "- key: value" or "- value"
             if (content.startsWith('-')) {
                 isListMode = true;
                 const valuePart = content.substring(1).trim();
                 
                 if (!valuePart) {
-                    // Object inside list (on next lines)
-                    // e.g. 
-                    // - 
-                    //   id: 1
+                    // Object inside list (properties on next lines)
                     currentLine++;
-                    listResult.push(parseBlock(indentLevel + 1)); // Assuming sub-indent
-                } else if (valuePart.includes(':') && !valuePart.startsWith('"') && !valuePart.startsWith("'")) {
+                    listResult.push(parseBlock(indentLevel + 1));
+                } else if (valuePart.includes(':') && !valuePart.startsWith('"') && !valuePart.startsWith("'") && !valuePart.startsWith('{')) {
                     // Inline Object definition start: "- key: value"
-                    // Treat "- " as part of indentation for the object
-                    // We construct a virtual block for the object
                     const keyColonIdx = valuePart.indexOf(':');
                     const key = valuePart.substring(0, keyColonIdx).trim();
                     const valStr = valuePart.substring(keyColonIdx + 1).trim();
                     
                     currentLine++; // Consume this line
                     
-                    // Start an object with this key
-                    const obj = parseBlock(indentLevel + 2); // Recursively parse rest of object properties
-                    // But we need to add the inline key/value first
-                    if (valStr) {
-                        obj[key] = parseValue(valStr);
-                    } else {
-                        // Value is on next line? Not handled in this simplified parser for inline start
-                        // But wait, parseBlock(indentLevel + 2) handles subsequent lines.
-                        // We just need to merge {key: val} into it if val exists, or let parseBlock handle children
-                        // Actually, if valStr is empty, the children are in parseBlock.
-                        // If valStr is not empty, it's a primitive prop.
-                    }
-                    
-                    // Wait, parseBlock parses *lines*. We consumed the line.
-                    // The object properties are on subsequent lines with higher indent.
-                    // But we missed the property on *this* line.
-                    // Better approach: Treat "- key: val" as:
-                    //   key: val
-                    //   ... other props
-                    // So we create the object, assign the inline prop, then parse subsequent lines.
-                    
                     const objItem: any = {};
                     if (valStr) {
                         objItem[key] = parseValue(valStr);
                     } else {
-                        // key: <newline> object
-                        objItem[key] = parseBlock(indentLevel + 2); // Heuristic indent
+                        objItem[key] = parseBlock(indentLevel + 2);
                     }
                     
                     // Merge with subsequent lines that belong to this item
-                    const rest = parseBlock(indentLevel + 1); // Indent relative to dash
+                    const rest = parseBlock(indentLevel + 1); 
                     Object.assign(objItem, rest);
                     
                     listResult.push(objItem);
                 } else {
-                    // Primitive array item: "- value"
+                    // Primitive array item or JSON object: "- value" or "- { ... }"
                     listResult.push(parseValue(valuePart));
                     currentLine++;
                 }
             } 
-            // Key-Value Pair
+            // Key-Value Pair: "key: value"
             else if (content.includes(':')) {
-                // Careful with colons in strings. Assuming keys don't have colons.
                 const colonIdx = content.indexOf(':');
-                const key = content.substring(0, colonIdx).trim().replace(/['"]/g, '');
+                const key = content.substring(0, colonIdx).trim().replace(/['"]/g, ''); // Strip quotes from key
                 const valStr = content.substring(colonIdx + 1).trim();
                 
                 currentLine++;
@@ -377,11 +340,11 @@ export const parseConfigYaml = (yaml: string): any => {
                     // Value is inline
                     result[key] = parseValue(valStr);
                 } else {
-                    // Value is a nested block (object or array)
+                    // Value is a nested block (object or array on next lines)
                     result[key] = parseBlock(indentLevel + 1);
                 }
             } else {
-                // Unknown format or continuation? Skip
+                // Unknown format? Skip to avoid infinite loop
                 currentLine++;
             }
         }

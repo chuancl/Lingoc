@@ -12,26 +12,30 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ config, setConfi
   const [newBlacklist, setNewBlacklist] = useState('');
   const [newWhitelist, setNewWhitelist] = useState('');
 
+  // Defensive: Ensure arrays exist
+  const blacklist = Array.isArray(config.blacklist) ? config.blacklist : [];
+  const whitelist = Array.isArray(config.whitelist) ? config.whitelist : [];
+
   const addBlacklist = () => {
     if (newBlacklist.trim()) {
-      setConfig({ ...config, blacklist: [...config.blacklist, newBlacklist.trim()] });
+      setConfig({ ...config, blacklist: [...blacklist, newBlacklist.trim()] });
       setNewBlacklist('');
     }
   };
 
   const addWhitelist = () => {
     if (newWhitelist.trim()) {
-      setConfig({ ...config, whitelist: [...config.whitelist, newWhitelist.trim()] });
+      setConfig({ ...config, whitelist: [...whitelist, newWhitelist.trim()] });
       setNewWhitelist('');
     }
   };
 
   const removeBlacklist = (item: string) => {
-    setConfig({ ...config, blacklist: config.blacklist.filter(i => i !== item) });
+    setConfig({ ...config, blacklist: blacklist.filter(i => i !== item) });
   };
 
   const removeWhitelist = (item: string) => {
-    setConfig({ ...config, whitelist: config.whitelist.filter(i => i !== item) });
+    setConfig({ ...config, whitelist: whitelist.filter(i => i !== item) });
   };
 
   // Helper component for toggle items
@@ -186,7 +190,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ config, setConfi
                     <ShieldAlert className="w-4 h-4 text-red-500" />
                     <h3 className="text-sm font-bold text-slate-800">黑名单 (永远不翻译)</h3>
                   </div>
-                  <span className="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-100">{config.blacklist.length} 条规则</span>
+                  <span className="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-100">{blacklist.length} 条规则</span>
               </div>
               
               <div className="flex gap-2 mb-4">
@@ -203,8 +207,8 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ config, setConfi
               
               <div className="flex-1 bg-white border border-slate-200 rounded-lg overflow-hidden min-h-[120px]">
                  <div className="max-h-48 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                    {config.blacklist.length > 0 ? (
-                        config.blacklist.map(site => (
+                    {blacklist.length > 0 ? (
+                        blacklist.map(site => (
                             <div key={site} className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded text-xs border border-slate-100 group hover:border-red-100 hover:bg-red-50 transition-colors">
                             <span className="font-mono text-slate-600 truncate">{site}</span>
                             <button onClick={() => removeBlacklist(site)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3.5 h-3.5"/></button>
@@ -227,7 +231,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ config, setConfi
                     <ShieldCheck className="w-4 h-4 text-green-500" />
                     <h3 className="text-sm font-bold text-slate-800">白名单 (强制翻译)</h3>
                   </div>
-                  <span className="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-100">{config.whitelist.length} 条规则</span>
+                  <span className="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-100">{whitelist.length} 条规则</span>
               </div>
               
               <div className="flex gap-2 mb-4">
@@ -244,8 +248,8 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ config, setConfi
               
               <div className="flex-1 bg-white border border-slate-200 rounded-lg overflow-hidden min-h-[120px]">
                  <div className="max-h-48 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                    {config.whitelist.length > 0 ? (
-                        config.whitelist.map(site => (
+                    {whitelist.length > 0 ? (
+                        whitelist.map(site => (
                             <div key={site} className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded text-xs border border-slate-100 group hover:border-green-100 hover:bg-green-50 transition-colors">
                             <span className="font-mono text-slate-600 truncate">{site}</span>
                             <button onClick={() => removeWhitelist(site)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3.5 h-3.5"/></button>

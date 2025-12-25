@@ -14,16 +14,24 @@ import { entriesStorage, scenariosStorage, pageWidgetConfigStorage, autoTranslat
 import { preloadVoices } from './utils/audio';
 
 // --- Utility: Deep Merge for Config ---
-// Ensures that `source` merges into `target`, but if `source` lacks a key (undefined), `target`'s value is kept.
-// For Arrays: It REPLACES target with source (if source is array), unless source is empty/undefined.
+// Ensures that `source` merges into `target`.
+// - If `source` (imported) lacks a key, `target` (default) value is kept.
+// - Arrays are replaced if source is an array, otherwise default is kept.
 const deepMergeConfig = (defaultConfig: any, importedConfig: any): any => {
     if (importedConfig === undefined || importedConfig === null) {
         return defaultConfig;
     }
 
+    // If types mismatch (e.g. default is array, imported is object), revert to default
+    if (Array.isArray(defaultConfig) !== Array.isArray(importedConfig)) {
+        return defaultConfig;
+    }
+
     if (Array.isArray(defaultConfig)) {
-        // For arrays (scenarios, engines), if import has data, use it. Otherwise keep default/current.
-        return Array.isArray(importedConfig) && importedConfig.length > 0 ? importedConfig : defaultConfig;
+        // For arrays, if imported has data, use it. Otherwise keep default (if that's desired behavior)
+        // OR better for config: if imported is empty array, it might mean user cleared it. 
+        // But for safety against bad parse, let's use imported only if it's an array.
+        return importedConfig; 
     }
 
     if (typeof defaultConfig === 'object' && defaultConfig !== null) {
@@ -33,14 +41,19 @@ const deepMergeConfig = (defaultConfig: any, importedConfig: any): any => {
             const impVal = importedConfig[key];
 
             if (typeof defVal === 'object' && defVal !== null && !Array.isArray(defVal)) {
-                // Recursively merge objects (like showSections, templates)
+                // Recursively merge nested objects
                 result[key] = deepMergeConfig(defVal, impVal);
             } else if (impVal !== undefined) {
-                // Primitive values or Arrays: Use imported if present
+                // Primitive values: Use imported if present
                 result[key] = impVal;
             }
         });
-        // Also keep keys that are in imported but not in default (e.g. custom fields), though less critical
+        // Keep keys that are in imported but not in default (custom fields)
+        if (importedConfig) {
+             Object.keys(importedConfig).forEach(key => {
+                 if (result[key] === undefined) result[key] = importedConfig[key];
+             });
+        }
         return result;
     }
 
@@ -90,6 +103,7 @@ const App: React.FC = () => {
       await seedInitialData();
       
       const currentDicts = await dictionariesStorage.getValue();
+      // Migration logic for dictionaries
       const iciba = currentDicts.find(d => d.id === 'iciba');
       let finalDictionaries = currentDicts;
       if (iciba && iciba.priority !== 1) {
@@ -114,20 +128,21 @@ const App: React.FC = () => {
         interactionConfigStorage.getValue(),
       ]);
       
-      // Initial Load: Merge with Defaults to ensure no missing keys from old versions
-      setScenarios(s.length ? s : INITIAL_SCENARIOS);
-      setEntries(e);
+      // Apply Deep Merge on initial load to ensure structure integrity against old data
+      setScenarios(Array.isArray(s) ? s : INITIAL_SCENARIOS);
+      setEntries(Array.isArray(e) ? e : []);
       setPageWidgetConfig(deepMergeConfig(DEFAULT_PAGE_WIDGET, p));
       setAutoTranslate(deepMergeConfig(DEFAULT_AUTO_TRANSLATE, a));
-      setEngines(eng.length ? eng : INITIAL_ENGINES);
+      setEngines(Array.isArray(eng) ? eng : INITIAL_ENGINES);
       setAnkiConfig(deepMergeConfig(DEFAULT_ANKI_CONFIG, ank));
       
       const migratedStyles = { ...DEFAULT_STYLES };
-      Object.keys(sty).forEach(key => {
-          const category = key as WordCategory;
-          // Deep merge each style category
-          migratedStyles[category] = deepMergeConfig(DEFAULT_STYLE, sty[category]);
-      });
+      if (sty) {
+          Object.keys(sty).forEach(key => {
+              const category = key as WordCategory;
+              migratedStyles[category] = deepMergeConfig(DEFAULT_STYLE, sty[category]);
+          });
+      }
       setStyles(migratedStyles);
       
       setOriginalTextConfig(deepMergeConfig(DEFAULT_ORIGINAL_TEXT_CONFIG, orig));
@@ -179,18 +194,18 @@ const App: React.FC = () => {
 
   // --- Configuration Import Logic ---
   const handleConfigImport = async (newConfig: any) => {
-      // Use deepMergeConfig for robust importing
+      // Use deepMergeConfig to robustly merge imported data with defaults
+      // This prevents 'undefined' errors if the import file is partial or malformed
       
       const nextAutoTranslate = deepMergeConfig(DEFAULT_AUTO_TRANSLATE, newConfig.general);
       const nextInteraction = deepMergeConfig(DEFAULT_WORD_INTERACTION, newConfig.interaction);
       const nextPageWidget = deepMergeConfig(DEFAULT_PAGE_WIDGET, newConfig.pageWidget);
       const nextAnki = deepMergeConfig(DEFAULT_ANKI_CONFIG, newConfig.anki);
       
-      // Arrays: Replace if valid
-      const nextScenarios = (Array.isArray(newConfig.scenarios) && newConfig.scenarios.length > 0) 
-          ? newConfig.scenarios : scenarios;
-      const nextEngines = (Array.isArray(newConfig.engines) && newConfig.engines.length > 0)
-          ? newConfig.engines : engines;
+      // For Arrays, checks if valid array in import, else falls back to existing state (not default, to preserve user data if import fails specific section)
+      // Actually, for full config restore, we probably want to overwrite.
+      const nextScenarios = (Array.isArray(newConfig.scenarios)) ? newConfig.scenarios : scenarios;
+      const nextEngines = (Array.isArray(newConfig.engines)) ? newConfig.engines : engines;
 
       // Styles
       const nextStyles = { ...DEFAULT_STYLES };
@@ -210,7 +225,7 @@ const App: React.FC = () => {
       setEngines(nextEngines);
       setStyles(nextStyles);
 
-      // Force Save
+      // Force Save immediately to disk
       await Promise.all([
           autoTranslateConfigStorage.setValue(nextAutoTranslate),
           interactionConfigStorage.setValue(nextInteraction),
